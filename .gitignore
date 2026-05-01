@@ -1,0 +1,41 @@
+# deps & build
+node_modules
+.next
+.turbo
+dist
+out
+*.tsbuildinfo
+
+# secrets & env
+.env
+.env.local
+.env.*.local
+.env.production
+.env.production.local
+.env.development.local
+
+# logs / caches
+*.log
+.cache
+coverage
+.DS_Store
+.vercel
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# data (uploaded videos / transcoded HLS)
+storage/
+uploads/
+tmp/
+
+# tauri
+target/
+src-tauri/gen/
+src-tauri/target/
+*.keystore
+*.apk
+*.apk.idsig
+
+# pnpm
+.pnpm-store/

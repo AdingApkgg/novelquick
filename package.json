@@ -1,0 +1,45 @@
+{
+  "name": "novelquick",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "db:generate": "pnpm --filter @nq/db generate",
+    "db:push": "pnpm --filter @nq/db push",
+    "db:migrate": "pnpm --filter @nq/db migrate",
+    "db:seed": "pnpm --filter @nq/db seed",
+    "db:studio": "pnpm --filter @nq/db studio",
+    "web:dev": "pnpm --filter web dev",
+    "admin:dev": "pnpm --filter admin dev",
+    "transcoder:dev": "pnpm --filter @nq/transcoder dev",
+    "mobile:android:dev": "pnpm --filter mobile android:dev",
+    "mobile:android:build": "pnpm --filter mobile android:build",
+    "mobile:ios:dev": "pnpm --filter mobile ios:dev",
+    "mobile:ios:build": "pnpm --filter mobile ios:build",
+    "mobile:desktop:dev": "pnpm --filter mobile desktop:dev",
+    "mobile:desktop:build": "pnpm --filter mobile desktop:build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "turbo": "^2",
+    "prettier": "^3.3.3",
+    "typescript": "^6.0.2"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
+  }
+}

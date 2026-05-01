@@ -1,0 +1,652 @@
+// NovelQuick — Prisma schema
+// Postgres + better-auth + drama/episode + danmaku + monetization
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ===================== Auth (better-auth compatible) =====================
+
+model User {
+  id            String   @id
+  name          String?
+  displayName   String?
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  role          UserRole @default(USER)
+  status        UserStatus @default(ACTIVE)
+  banReason     String?
+  bio           String?
+  vipUntil      DateTime?
+  coinBalance   Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions      Session[]
+  accounts      Account[]
+  verifications Verification[]
+
+  comments      Comment[]
+  danmaku       Danmaku[]
+  likes         Like[]
+  favorites     Favorite[]
+  follows       FollowDrama[]
+  watchHistory  WatchHistory[]
+  unlocks       EpisodeUnlock[]
+  orders        Order[]
+  coinTxs       CoinTransaction[]
+  auditLogs     AuditLog[]    @relation("AuditActor")
+
+  @@index([role])
+  @@index([status])
+  @@map("user")
+}
+
+enum UserRole {
+  USER
+  EDITOR
+  ADMIN
+  SUPERADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+  DELETED
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String   @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  userId     String?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ===================== Catalog =====================
+
+model Category {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  cover     String?
+  sortOrder Int      @default(0)
+  isVisible Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dramas DramaCategory[]
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+
+  dramas DramaTag[]
+}
+
+model Drama {
+  id            String      @id @default(cuid())
+  slug          String      @unique
+  title         String
+  subtitle      String?
+  description   String?     @db.Text
+  cover         String?
+  poster        String?
+  trailerUrl    String?
+  status        DramaStatus @default(DRAFT)
+  releaseStatus ReleaseStatus @default(ONGOING)
+  region        String?
+  language      String?
+  year          Int?
+  totalEpisodes Int         @default(0)
+  isVip         Boolean     @default(false)
+  freeEpisodes  Int         @default(3)
+  unlockCoins   Int         @default(10)
+  rating        Float       @default(0)
+  ratingCount   Int         @default(0)
+  playCount     BigInt      @default(0)
+  likeCount     Int         @default(0)
+  favoriteCount Int         @default(0)
+  publishedAt   DateTime?
+  sortWeight    Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  episodes   Episode[]
+  categories DramaCategory[]
+  tags       DramaTag[]
+  comments   Comment[]
+  likes      Like[]
+  favorites  Favorite[]
+  follows    FollowDrama[]
+  watchHistory WatchHistory[]
+  feedItems  FeedSlotItem[]
+  rankItems  LeaderboardItem[]
+
+  @@index([status, publishedAt])
+  @@index([sortWeight])
+}
+
+enum DramaStatus {
+  DRAFT
+  REVIEWING
+  PUBLISHED
+  OFFLINE
+}
+
+enum ReleaseStatus {
+  ONGOING
+  COMPLETED
+  PAUSED
+}
+
+model DramaCategory {
+  dramaId    String
+  categoryId String
+  drama      Drama    @relation(fields: [dramaId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([dramaId, categoryId])
+  @@index([categoryId])
+}
+
+model DramaTag {
+  dramaId String
+  tagId   String
+  drama   Drama @relation(fields: [dramaId], references: [id], onDelete: Cascade)
+  tag     Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([dramaId, tagId])
+  @@index([tagId])
+}
+
+model Episode {
+  id          String        @id @default(cuid())
+  dramaId     String
+  index       Int
+  title       String
+  description String?       @db.Text
+  duration    Int           @default(0)
+  coverUrl    String?
+  status      EpisodeStatus @default(DRAFT)
+  isFree      Boolean       @default(true)
+  unlockCoins Int           @default(0)
+  playCount   BigInt        @default(0)
+  publishedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  drama          Drama            @relation(fields: [dramaId], references: [id], onDelete: Cascade)
+  videoAssets    VideoAsset[]
+  transcodeJobs  TranscodeJob[]
+  comments       Comment[]
+  danmaku        Danmaku[]
+  watchHistory   WatchHistory[]
+  unlocks        EpisodeUnlock[]
+
+  @@unique([dramaId, index])
+  @@index([dramaId, index])
+  @@index([status])
+}
+
+enum EpisodeStatus {
+  DRAFT
+  TRANSCODING
+  READY
+  FAILED
+  OFFLINE
+}
+
+model VideoAsset {
+  id         String   @id @default(cuid())
+  episodeId  String
+  kind       AssetKind
+  url        String
+  width      Int?
+  height     Int?
+  bitrate    Int?
+  size       BigInt?
+  durationMs Int?
+  createdAt  DateTime @default(now())
+
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@index([episodeId])
+}
+
+enum AssetKind {
+  ORIGINAL
+  HLS_MASTER
+  HLS_VARIANT
+  THUMBNAIL
+  PREVIEW
+}
+
+model TranscodeJob {
+  id          String              @id @default(cuid())
+  episodeId   String
+  status      TranscodeJobStatus  @default(PENDING)
+  progress    Int                 @default(0)
+  error       String?
+  inputPath   String
+  outputDir   String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@index([episodeId])
+  @@index([status])
+}
+
+enum TranscodeJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+// ===================== Social =====================
+
+model Comment {
+  id          String        @id @default(cuid())
+  userId      String
+  dramaId     String?
+  episodeId   String?
+  parentId    String?
+  rootId      String?
+  content     String        @db.Text
+  status      CommentStatus @default(VISIBLE)
+  likeCount   Int           @default(0)
+  replyCount  Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drama   Drama?   @relation(fields: [dramaId], references: [id], onDelete: Cascade)
+  episode Episode? @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  parent  Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([dramaId, createdAt])
+  @@index([episodeId, createdAt])
+  @@index([userId])
+  @@index([rootId])
+  @@index([status])
+}
+
+enum CommentStatus {
+  VISIBLE
+  HIDDEN
+  PENDING
+  DELETED
+}
+
+model Danmaku {
+  id        String        @id @default(cuid())
+  episodeId String
+  userId    String
+  timeMs    Int
+  text      String
+  color     String        @default("#ffffff")
+  fontSize  Int           @default(24)
+  mode      DanmakuMode   @default(SCROLL)
+  status    DanmakuStatus @default(VISIBLE)
+  createdAt DateTime      @default(now())
+
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([episodeId, timeMs])
+  @@index([status])
+}
+
+enum DanmakuMode {
+  SCROLL
+  TOP
+  BOTTOM
+}
+
+enum DanmakuStatus {
+  VISIBLE
+  HIDDEN
+  DELETED
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  dramaId   String?
+  commentId String?
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drama   Drama?   @relation(fields: [dramaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dramaId])
+  @@unique([userId, commentId])
+  @@index([dramaId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  dramaId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drama Drama @relation(fields: [dramaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dramaId])
+  @@index([dramaId])
+}
+
+model FollowDrama {
+  id        String   @id @default(cuid())
+  userId    String
+  dramaId   String
+  createdAt DateTime @default(now())
+  notify    Boolean  @default(true)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drama Drama @relation(fields: [dramaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dramaId])
+  @@index([dramaId])
+}
+
+model WatchHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  dramaId      String
+  episodeId    String
+  positionMs   Int      @default(0)
+  durationMs   Int      @default(0)
+  finished     Boolean  @default(false)
+  lastWatchAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drama   Drama   @relation(fields: [dramaId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, episodeId])
+  @@index([userId, lastWatchAt])
+  @@index([dramaId])
+}
+
+// ===================== Recommendation / Discovery =====================
+
+model FeedSlot {
+  id          String   @id @default(cuid())
+  key         String   @unique // home_recommend, follow_top, banner, etc.
+  name        String
+  position    String   // top | banner | section | rank
+  isActive    Boolean  @default(true)
+  startAt     DateTime?
+  endAt       DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items FeedSlotItem[]
+}
+
+model FeedSlotItem {
+  id        String   @id @default(cuid())
+  slotId    String
+  dramaId   String?
+  bannerImg String?
+  bannerUrl String?
+  title     String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  slot  FeedSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  drama Drama?   @relation(fields: [dramaId], references: [id], onDelete: SetNull)
+
+  @@index([slotId, sortOrder])
+}
+
+model Leaderboard {
+  id        String   @id @default(cuid())
+  key       String   @unique // hot, new, follow, vip
+  name      String
+  isActive  Boolean  @default(true)
+  refreshedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items LeaderboardItem[]
+}
+
+model LeaderboardItem {
+  id            String  @id @default(cuid())
+  leaderboardId String
+  dramaId       String
+  rank          Int
+  score         Float   @default(0)
+
+  leaderboard Leaderboard @relation(fields: [leaderboardId], references: [id], onDelete: Cascade)
+  drama       Drama       @relation(fields: [dramaId], references: [id], onDelete: Cascade)
+
+  @@unique([leaderboardId, dramaId])
+  @@index([leaderboardId, rank])
+}
+
+// ===================== Monetization =====================
+
+model EpisodeUnlock {
+  id        String   @id @default(cuid())
+  userId    String
+  episodeId String
+  source    UnlockSource
+  coins     Int      @default(0)
+  orderId   String?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, episodeId])
+  @@index([episodeId])
+}
+
+enum UnlockSource {
+  COINS
+  VIP
+  AD
+  GIFT
+  ADMIN
+}
+
+model VipPlan {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  durationDays Int
+  priceCents  Int
+  bonusCoins  Int      @default(0)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders Order[]
+}
+
+model CoinPack {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  name       String
+  coins      Int
+  bonusCoins Int      @default(0)
+  priceCents Int
+  isActive   Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  orders Order[]
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  userId     String
+  type       OrderType
+  vipPlanId  String?
+  coinPackId String?
+  amountCents Int
+  status     OrderStatus @default(PENDING)
+  paymentRef String?
+  paidAt     DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vipPlan   VipPlan?  @relation(fields: [vipPlanId], references: [id], onDelete: SetNull)
+  coinPack  CoinPack? @relation(fields: [coinPackId], references: [id], onDelete: SetNull)
+  unlocks   EpisodeUnlock[]
+  coinTxs   CoinTransaction[]
+
+  @@index([userId, status])
+}
+
+enum OrderType {
+  VIP
+  COIN_PACK
+  EPISODE
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELED
+  REFUNDED
+  FAILED
+}
+
+model CoinTransaction {
+  id        String      @id @default(cuid())
+  userId    String
+  delta     Int
+  balance   Int
+  reason    CoinReason
+  orderId   String?
+  episodeId String?
+  note      String?
+  createdAt DateTime    @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+enum CoinReason {
+  PURCHASE
+  UNLOCK
+  GIFT
+  AD_REWARD
+  REFUND
+  ADMIN_ADJUST
+  CHECK_IN
+}
+
+// ===================== Ads (placeholder for future) =====================
+
+model AdSlot {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  type      AdType
+  isActive  Boolean  @default(true)
+  config    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum AdType {
+  REWARDED
+  BANNER
+  SPLASH
+  IN_FEED
+}
+
+// ===================== Audit =====================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  resource  String
+  resourceId String?
+  before    Json?
+  after     Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+}

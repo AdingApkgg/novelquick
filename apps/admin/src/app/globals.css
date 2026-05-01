@@ -1,0 +1,5 @@
+@import "@nq/ui/styles.css";
+
+@source "../node_modules/@nq/ui/src/**/*.{ts,tsx}";
+@source "./**/*.{ts,tsx}";
+@source "../src/**/*.{ts,tsx}";

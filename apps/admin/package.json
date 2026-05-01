@@ -1,0 +1,46 @@
+{
+  "name": "admin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack -p 3501",
+    "build": "next build",
+    "postbuild": "rm -rf .next/standalone/apps/admin/.next/static && cp -r .next/static .next/standalone/apps/admin/.next/static",
+    "start": "next start -p 3501",
+    "lint": "echo 'no lint'",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nq/api": "workspace:*",
+    "@nq/db": "workspace:*",
+    "@nq/shared": "workspace:*",
+    "@nq/ui": "workspace:*",
+    "@hookform/resolvers": "^5.2.2",
+    "@tanstack/react-query": "^5.99.0",
+    "@trpc/client": "^11.16.0",
+    "@trpc/server": "^11.16.0",
+    "@trpc/tanstack-react-query": "^11.16.0",
+    "better-auth": "^1.6.2",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.8.0",
+    "next": "16.2.3",
+    "next-themes": "^0.4.6",
+    "radix-ui": "^1.4.3",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "react-hook-form": "^7.72.1",
+    "sonner": "^2.0.7",
+    "superjson": "^2.2.6",
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^6.0.2"
+  }
+}

@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: novelquick-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nq
+      POSTGRES_PASSWORD: nq
+      POSTGRES_DB: novelquick
+    ports:
+      - "127.0.0.1:54320:5432"
+    volumes:
+      - nq_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nq -d novelquick"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: novelquick-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:63790:6379"
+    volumes:
+      - nq_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Optional: only needed when VIDEO_STORAGE_DRIVER=s3
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniominio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - nq_miniodata:/data
+    profiles: ["s3"]
+
+volumes:
+  nq_pgdata:
+  nq_redis:
+  nq_miniodata:
