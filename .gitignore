@@ -13,6 +13,8 @@ out
 .env.production
 .env.production.local
 .env.development.local
+.admin-credentials.local
+*-credentials.local
 
 # logs / caches
 *.log
