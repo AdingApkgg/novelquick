@@ -10,6 +10,7 @@
     "db:push": "pnpm --filter @nq/db push",
     "db:migrate": "pnpm --filter @nq/db migrate",
     "db:seed": "pnpm --filter @nq/db seed",
+    "db:seed:test": "pnpm --filter @nq/db seed:test",
     "db:studio": "pnpm --filter @nq/db studio",
     "web:dev": "pnpm --filter web dev",
     "admin:dev": "pnpm --filter admin dev",

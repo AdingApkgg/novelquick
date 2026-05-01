@@ -16,6 +16,7 @@
     "deploy": "prisma migrate deploy",
     "studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
+    "seed:test": "tsx prisma/seed-test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "echo 'no lint'"
   },
