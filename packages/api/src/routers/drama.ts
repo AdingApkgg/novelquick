@@ -91,4 +91,65 @@ export const dramaRouter = router({
     if (!drama) throw new TRPCError({ code: "NOT_FOUND" });
     return { ...drama, playCount: Number(drama.playCount) };
   }),
+
+  /** Similar dramas — overlap on categories, fall back to similar tags. */
+  similar: publicProcedure
+    .input(z.object({ id: z.string(), limit: z.number().int().min(1).max(20).default(6) }))
+    .query(async ({ ctx, input }) => {
+      const base = await ctx.prisma.drama.findUnique({
+        where: { id: input.id },
+        include: { categories: true, tags: true },
+      });
+      if (!base) return [];
+
+      const catIds = base.categories.map((c) => c.categoryId);
+      const tagIds = base.tags.map((t) => t.tagId);
+
+      const items = await ctx.prisma.drama.findMany({
+        where: {
+          status: "PUBLISHED",
+          id: { not: base.id },
+          OR: [
+            ...(catIds.length
+              ? [{ categories: { some: { categoryId: { in: catIds } } } }]
+              : []),
+            ...(tagIds.length ? [{ tags: { some: { tagId: { in: tagIds } } } }] : []),
+          ],
+        },
+        orderBy: [{ playCount: "desc" }],
+        take: input.limit,
+        select: {
+          id: true,
+          title: true,
+          cover: true,
+          totalEpisodes: true,
+          isVip: true,
+          rating: true,
+          playCount: true,
+        },
+      });
+      return items.map((d) => ({ ...d, playCount: Number(d.playCount) }));
+    }),
+
+  /** Last-watched episode for the current user, used for "继续观看" */
+  myProgress: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.user) return null;
+      const wh = await ctx.prisma.watchHistory.findFirst({
+        where: { userId: ctx.user.id, dramaId: input.id },
+        orderBy: { lastWatchAt: "desc" },
+        include: {
+          episode: { select: { index: true, title: true } },
+        },
+      });
+      if (!wh) return null;
+      return {
+        episodeIndex: wh.episode.index,
+        episodeTitle: wh.episode.title,
+        positionMs: wh.positionMs,
+        durationMs: wh.durationMs,
+        finished: wh.finished,
+      };
+    }),
 });

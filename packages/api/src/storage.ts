@@ -63,10 +63,14 @@ export function getStorage(): StorageDriver {
   throw new Error(`Unsupported VIDEO_STORAGE_DRIVER: ${driver}`);
 }
 
+const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"]);
+
 export function generateUploadKey(filename: string) {
-  const ext = extname(filename) || ".mp4";
+  const ext = (extname(filename) || ".mp4").toLowerCase();
   const id = randomUUID();
-  return `originals/${new Date().toISOString().slice(0, 10)}/${id}${ext}`;
+  const date = new Date().toISOString().slice(0, 10);
+  const prefix = IMAGE_EXT.has(ext) ? "images" : "originals";
+  return `${prefix}/${date}/${id}${ext}`;
 }
 
 export function generateHlsDir(episodeId: string) {

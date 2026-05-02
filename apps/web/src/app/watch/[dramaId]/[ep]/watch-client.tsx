@@ -14,6 +14,10 @@ import {
   Lock,
   Play,
   Pause,
+  Settings2,
+  PictureInPicture2,
+  Gauge,
+  X,
 } from "lucide-react";
 import {
   Sheet,
@@ -36,6 +40,8 @@ import { UnlockSheet } from "./unlock-sheet";
 import { toast } from "sonner";
 import type { WatchPayload } from "@nq/shared/types";
 
+const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
+
 export function WatchClient({ dramaId, initial }: { dramaId: string; initial: WatchPayload }) {
   const trpc = useTRPC();
   const qc = useQueryClient();
@@ -51,7 +57,33 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
   const [paused, setPaused] = React.useState(false);
   const [progress, setProgress] = React.useState({ pos: data.positionMs, dur: data.episode.duration * 1000 });
   const [showDanmaku, setShowDanmaku] = React.useState(true);
+  const [speed, setSpeed] = React.useState<number>(1);
+  const [pipActive, setPipActive] = React.useState(false);
+  const [autoNextSec, setAutoNextSec] = React.useState<number | null>(null);
+  const cancelAutoNextRef = React.useRef(false);
 
+  // Find next playable episode
+  const nextEpisode = React.useMemo(
+    () => data.episodes.find((e) => e.index === data.episode.index + 1 && !e.locked),
+    [data.episode.index, data.episodes],
+  );
+
+  // Persist speed preference
+  React.useEffect(() => {
+    try {
+      const v = localStorage.getItem("nq_speed");
+      if (v) setSpeed(parseFloat(v) || 1);
+    } catch {}
+  }, []);
+  React.useEffect(() => {
+    const v = videoRef.current;
+    if (v) v.playbackRate = speed;
+    try {
+      localStorage.setItem("nq_speed", String(speed));
+    } catch {}
+  }, [speed, data.episode.id]);
+
+  // Progress reporting
   const reportMut = useMutation(trpc.episode.reportProgress.mutationOptions());
   React.useEffect(() => {
     const id = setInterval(() => {
@@ -77,18 +109,40 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
     v.addEventListener("loadedmetadata", seek);
   }, [data.positionMs, data.episode.id]);
 
+  // Reset countdown when episode changes
+  React.useEffect(() => {
+    setAutoNextSec(null);
+    cancelAutoNextRef.current = false;
+  }, [data.episode.id]);
+
   const likeMut = useMutation(trpc.interact.toggleLike.mutationOptions());
   const favMut = useMutation(trpc.interact.toggleFavorite.mutationOptions());
   const followMut = useMutation(trpc.interact.toggleFollow.mutationOptions());
 
   const goEpisode = (index: number) => router.push(`/watch/${dramaId}/${index}`);
 
-  const onTimeUpdate = React.useCallback((pos: number, dur: number) => setProgress({ pos, dur }), []);
+  const onTimeUpdate = React.useCallback(
+    (pos: number, dur: number) => {
+      setProgress({ pos, dur });
+      // start auto-next countdown 5s before end
+      if (
+        nextEpisode &&
+        !cancelAutoNextRef.current &&
+        dur > 0 &&
+        dur - pos <= 5000 &&
+        dur - pos > 0
+      ) {
+        const sec = Math.ceil((dur - pos) / 1000);
+        setAutoNextSec(sec);
+      }
+    },
+    [nextEpisode],
+  );
 
   const onEnded = React.useCallback(() => {
-    const next = data.episodes.find((e) => e.index === data.episode.index + 1);
-    if (next && !next.locked) goEpisode(next.index);
-  }, [data.episode.index, data.episodes]);
+    if (cancelAutoNextRef.current) return;
+    if (nextEpisode) goEpisode(nextEpisode.index);
+  }, [nextEpisode]);
 
   const togglePlay = () => {
     const v = videoRef.current;
@@ -99,6 +153,22 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
     } else {
       v.pause();
       setPaused(true);
+    }
+  };
+
+  const togglePip = async () => {
+    const v = videoRef.current;
+    if (!v) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+        setPipActive(false);
+      } else {
+        await v.requestPictureInPicture();
+        setPipActive(true);
+      }
+    } catch (e) {
+      toast.error("当前浏览器不支持画中画");
     }
   };
 
@@ -132,7 +202,10 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
 
       {/* Top bar */}
       <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-3 pt-[calc(env(safe-area-inset-top)+10px)] text-white">
-        <button onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm">
+        <button
+          onClick={() => router.back()}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm"
+        >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex items-center gap-2">
@@ -143,12 +216,14 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
           )}
           <p className="text-sm font-medium text-shadow-strong">第 {data.episode.index} 集</p>
         </div>
-        <button
-          className="rounded-full bg-black/40 px-2 py-1 text-xs backdrop-blur-sm"
-          onClick={() => setShowDanmaku((v) => !v)}
-        >
-          弹{showDanmaku ? "开" : "关"}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            className="rounded-full bg-black/40 px-2 py-1 text-xs backdrop-blur-sm"
+            onClick={() => setShowDanmaku((v) => !v)}
+          >
+            弹{showDanmaku ? "开" : "关"}
+          </button>
+        </div>
       </div>
 
       {/* Center play/pause overlay */}
@@ -169,9 +244,7 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
           onClick={() => {
             likeMut.mutate(
               { dramaId },
-              {
-                onSuccess: () => qc.invalidateQueries({ queryKey: trpc.episode.watch.queryKey() }),
-              },
+              { onSuccess: () => qc.invalidateQueries({ queryKey: trpc.episode.watch.queryKey() }) },
             );
           }}
         />
@@ -184,9 +257,7 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
           onClick={() => {
             favMut.mutate(
               { dramaId },
-              {
-                onSuccess: () => qc.invalidateQueries({ queryKey: trpc.episode.watch.queryKey() }),
-              },
+              { onSuccess: () => qc.invalidateQueries({ queryKey: trpc.episode.watch.queryKey() }) },
             );
           }}
         />
@@ -194,7 +265,12 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
           icon={<Share2 className="h-7 w-7" />}
           label="分享"
           onClick={() => {
-            navigator.share?.({ title: data.drama.title, url: window.location.href }).catch(() => {});
+            if (navigator.share) {
+              navigator.share({ title: data.drama.title, url: window.location.href }).catch(() => {});
+            } else {
+              navigator.clipboard?.writeText(window.location.href);
+              toast.success("链接已复制");
+            }
           }}
         />
         <EpisodeListSheet
@@ -202,6 +278,12 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
           currentIndex={data.episode.index}
           onPick={goEpisode}
           totalEpisodes={data.drama.totalEpisodes}
+        />
+        <SpeedSheet speed={speed} onChange={setSpeed} />
+        <ActionButton
+          icon={<PictureInPicture2 className={`h-7 w-7 ${pipActive ? "text-primary" : ""}`} />}
+          label="画中画"
+          onClick={togglePip}
         />
       </div>
 
@@ -211,7 +293,7 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-bold text-shadow-strong">{data.drama.title}</h1>
             <p className="truncate text-xs text-white/80 text-shadow-strong">
-              第 {data.episode.index} 集 · 共 {data.drama.totalEpisodes} 集
+              第 {data.episode.index} 集 · 共 {data.drama.totalEpisodes} 集 · {speed}× 速度
             </p>
           </div>
           <Button
@@ -249,6 +331,24 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
           </div>
         </div>
       </div>
+
+      {/* Auto-next overlay */}
+      {autoNextSec !== null && autoNextSec > 0 && nextEpisode && (
+        <div className="absolute right-3 top-20 z-40 flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-md">
+          <span>
+            {autoNextSec}s 后播放第 {nextEpisode.index} 集
+          </span>
+          <button
+            onClick={() => {
+              cancelAutoNextRef.current = true;
+              setAutoNextSec(null);
+            }}
+            className="rounded-full bg-white/15 p-1 hover:bg-white/30"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -269,6 +369,39 @@ function ActionButton({
       </div>
       <span className="text-[11px]">{label}</span>
     </button>
+  );
+}
+
+function SpeedSheet({ speed, onChange }: { speed: number; onChange: (s: number) => void }) {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <button className="flex flex-col items-center gap-1 text-white">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm">
+            <Gauge className="h-7 w-7" />
+          </div>
+          <span className="text-[11px]">{speed}×</span>
+        </button>
+      </SheetTrigger>
+      <SheetContent side="bottom" className="bg-card text-foreground">
+        <SheetHeader>
+          <SheetTitle>播放速度</SheetTitle>
+        </SheetHeader>
+        <div className="grid grid-cols-5 gap-2 p-4">
+          {SPEEDS.map((s) => (
+            <button
+              key={s}
+              onClick={() => onChange(s)}
+              className={`rounded-md border py-2 text-sm ${
+                s === speed ? "border-primary bg-primary/15 text-primary" : "border-border/30 hover:bg-accent"
+              }`}
+            >
+              {s}×
+            </button>
+          ))}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

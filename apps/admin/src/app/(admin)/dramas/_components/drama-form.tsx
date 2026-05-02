@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Label, Textarea, Switch, Card, CardContent } from "@nq/ui";
+import { ImageUploadField } from "@/components/image-upload-field";
 import { useTRPC } from "@/lib/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -77,12 +78,18 @@ export function DramaForm({ initial }: { initial?: any }) {
           />
         </Field>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="封面 URL">
-            <Input value={form.cover ?? ""} onChange={(e) => setForm((f) => ({ ...f, cover: e.target.value }))} />
-          </Field>
-          <Field label="海报 URL">
-            <Input value={form.poster ?? ""} onChange={(e) => setForm((f) => ({ ...f, poster: e.target.value }))} />
-          </Field>
+          <ImageUploadField
+            label="封面（竖版 3:4）"
+            value={form.cover ?? ""}
+            onChange={(v) => setForm((f) => ({ ...f, cover: v }))}
+            aspect="3 / 4"
+          />
+          <ImageUploadField
+            label="海报（横版 16:9）"
+            value={form.poster ?? ""}
+            onChange={(v) => setForm((f) => ({ ...f, poster: v }))}
+            aspect="16 / 9"
+          />
         </div>
         <Field label="预告片 URL">
           <Input

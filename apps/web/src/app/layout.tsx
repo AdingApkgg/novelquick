@@ -20,12 +20,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-CN" className="dark" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning>
       <body className="bg-background text-foreground antialiased">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <TRPCReactProvider>
             {children}
-            <Toaster theme="dark" position="top-center" richColors />
+            <Toaster position="top-center" richColors />
           </TRPCReactProvider>
         </ThemeProvider>
       </body>

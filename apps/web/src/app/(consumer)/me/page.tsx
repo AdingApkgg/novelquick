@@ -8,6 +8,8 @@ import { Coins, Crown, Settings, History, Heart, ShoppingBag, LogOut } from "luc
 import { useSession, signOut } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { ROUTES } from "@nq/shared/constants";
+import { CheckInCard } from "@/components/check-in-card";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function MePage() {
   const trpc = useTRPC();
@@ -40,6 +42,11 @@ export default function MePage() {
           <p className="text-lg font-semibold">{data?.displayName ?? data?.name ?? data?.email}</p>
           <p className="text-xs text-white/50">{data?.email}</p>
         </div>
+        <ThemeToggle />
+      </div>
+
+      <div className="mt-5">
+        <CheckInCard />
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3">

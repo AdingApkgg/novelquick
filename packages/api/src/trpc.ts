@@ -2,6 +2,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import type { Context } from "./context";
+import { rateLimit } from "./rate-limit";
 
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
@@ -44,3 +45,24 @@ const isSuperAdmin = t.middleware(({ ctx, next }) => {
 export const protectedProcedure = t.procedure.use(isAuthed);
 export const adminProcedure = t.procedure.use(isAdmin);
 export const superAdminProcedure = t.procedure.use(isSuperAdmin);
+
+/**
+ * Wrap a procedure to apply a per-user rate limit (fixed window).
+ *   rateLimited(protectedProcedure, { name: "comment", limit: 10, windowSec: 60 })
+ */
+export function rateLimited<TBuilder extends typeof publicProcedure>(
+  procedure: TBuilder,
+  opts: { name: string; limit: number; windowSec: number },
+): TBuilder {
+  return procedure.use(async ({ ctx, next }) => {
+    const subject = ctx.user?.id ?? ctx.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "anon";
+    const r = await rateLimit(`${opts.name}:${subject}`, opts.limit, opts.windowSec);
+    if (!r.ok) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: `操作太频繁，请 ${r.retryAfterSec}s 后重试`,
+      });
+    }
+    return next();
+  }) as TBuilder;
+}

@@ -1,4 +1,4 @@
-import { router, publicProcedure, protectedProcedure } from "../trpc";
+import { router, publicProcedure, protectedProcedure, rateLimited } from "../trpc";
 import { SendDanmaku, ListDanmaku } from "@nq/shared/schemas";
 
 export const danmakuRouter = router({
@@ -25,18 +25,20 @@ export const danmakuRouter = router({
     return items;
   }),
 
-  send: protectedProcedure.input(SendDanmaku).mutation(async ({ ctx, input }) => {
-    const dm = await ctx.prisma.danmaku.create({
-      data: {
-        episodeId: input.episodeId,
-        userId: ctx.user.id,
-        timeMs: input.timeMs,
-        text: input.text,
-        color: input.color,
-        fontSize: input.fontSize,
-        mode: input.mode,
-      },
-    });
-    return dm;
-  }),
+  send: rateLimited(protectedProcedure, { name: "danmaku", limit: 20, windowSec: 60 })
+    .input(SendDanmaku)
+    .mutation(async ({ ctx, input }) => {
+      const dm = await ctx.prisma.danmaku.create({
+        data: {
+          episodeId: input.episodeId,
+          userId: ctx.user.id,
+          timeMs: input.timeMs,
+          text: input.text,
+          color: input.color,
+          fontSize: input.fontSize,
+          mode: input.mode,
+        },
+      });
+      return dm;
+    }),
 });

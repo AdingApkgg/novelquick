@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trpcServer } from "@/lib/trpc/server";
 import { Badge, Button } from "@nq/ui";
-import { Crown, Play, Lock } from "lucide-react";
+import { Crown, Play, Lock, Star, Eye } from "lucide-react";
 import { ROUTES } from "@nq/shared/constants";
 import { formatPlayCount } from "@nq/shared/utils";
 
@@ -13,6 +13,16 @@ export default async function DramaDetail({ params }: { params: Promise<{ id: st
   const trpc = await trpcServer();
   const drama = await trpc.drama.byId({ id }).catch(() => null);
   if (!drama) notFound();
+
+  const [progress, similar] = await Promise.all([
+    trpc.drama.myProgress({ id }),
+    trpc.drama.similar({ id, limit: 6 }),
+  ]);
+
+  const continueIndex = progress?.episodeIndex ?? 1;
+  const continueLabel = progress
+    ? `继续观看 第${progress.episodeIndex}集`
+    : "立即播放";
 
   return (
     <div className="pb-20">
@@ -41,39 +51,97 @@ export default async function DramaDetail({ params }: { params: Promise<{ id: st
                 </Badge>
               ))}
             </div>
-            <p className="mt-2 text-xs text-white/50">
-              {drama.totalEpisodes} 集 · {formatPlayCount(drama.playCount)} 次播放 · 评分 {drama.rating.toFixed(1)}
-            </p>
+            <div className="mt-2 flex items-center gap-3 text-xs text-white/60">
+              <span className="flex items-center gap-0.5">
+                <Star className="h-3 w-3 text-amber-400" /> {drama.rating.toFixed(1)}
+              </span>
+              <span className="flex items-center gap-0.5">
+                <Eye className="h-3 w-3" /> {formatPlayCount(drama.playCount)}
+              </span>
+              <span>共 {drama.totalEpisodes} 集</span>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="px-4">
-        <Link href={ROUTES.watch(drama.id)}>
+        {/* Continue / Play */}
+        <Link href={ROUTES.watch(drama.id, continueIndex)}>
           <Button className="w-full" size="lg">
-            <Play className="mr-1 h-4 w-4 fill-current" /> 立即播放
+            <Play className="mr-1 h-4 w-4 fill-current" /> {continueLabel}
           </Button>
         </Link>
+
+        {/* Resume progress bar */}
+        {progress && progress.durationMs > 0 && !progress.finished && (
+          <div className="mt-3 rounded-md bg-card/50 px-3 py-2 text-xs text-muted-foreground">
+            <p>
+              上次看到 第 {progress.episodeIndex} 集 · {Math.round((progress.positionMs / progress.durationMs) * 100)}%
+            </p>
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full bg-primary"
+                style={{ width: `${(progress.positionMs / progress.durationMs) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {drama.description && (
           <p className="mt-4 text-sm leading-relaxed text-white/80">{drama.description}</p>
         )}
 
+        {/* Episodes */}
         <h2 className="mb-3 mt-6 text-base font-semibold">选集 ({drama.episodes.length})</h2>
         <div className="grid grid-cols-5 gap-2">
-          {drama.episodes.map((ep) => (
-            <Link
-              key={ep.id}
-              href={ROUTES.watch(drama.id, ep.index)}
-              className="relative flex h-12 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-medium"
-            >
-              {ep.index}
-              {!ep.isFree && ep.index > drama.freeEpisodes && (
-                <Lock className="absolute right-1 top-1 h-2.5 w-2.5 text-amber-400" />
-              )}
-            </Link>
-          ))}
+          {drama.episodes.map((ep) => {
+            const watched = progress && ep.index === progress.episodeIndex;
+            const locked = !ep.isFree && ep.index > drama.freeEpisodes;
+            return (
+              <Link
+                key={ep.id}
+                href={ROUTES.watch(drama.id, ep.index)}
+                className={`relative flex h-12 items-center justify-center rounded-md border text-sm font-medium ${
+                  watched
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-white/10 bg-white/5"
+                }`}
+              >
+                {ep.index}
+                {locked && <Lock className="absolute right-1 top-1 h-2.5 w-2.5 text-amber-400" />}
+              </Link>
+            );
+          })}
         </div>
+
+        {/* Similar */}
+        {similar.length > 0 && (
+          <section className="mt-8">
+            <h2 className="mb-3 text-base font-semibold">相似推荐</h2>
+            <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4">
+              {similar.map((s) => (
+                <Link
+                  key={s.id}
+                  href={ROUTES.drama(s.id)}
+                  className="w-28 shrink-0 snap-start space-y-1.5"
+                >
+                  <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-card">
+                    {s.cover && <img src={s.cover} alt={s.title} className="h-full w-full object-cover" />}
+                    {s.isVip && (
+                      <Badge variant="vip" className="absolute left-1 top-1 text-[9px]">
+                        VIP
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="truncate text-xs">{s.title}</p>
+                  <p className="truncate text-[10px] text-white/40">
+                    {s.totalEpisodes} 集 · {formatPlayCount(s.playCount)}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

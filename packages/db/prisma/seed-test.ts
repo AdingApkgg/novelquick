@@ -419,12 +419,12 @@ async function seedDramas() {
       orderBy: { index: "asc" },
     });
     for (const ep of readyEps) {
-      const url = SAMPLE_HLS[ep.index % SAMPLE_HLS.length];
+      const url = SAMPLE_HLS[ep.index % SAMPLE_HLS.length] ?? SAMPLE_HLS[0]!;
       await prisma.videoAsset.create({
         data: {
           episodeId: ep.id,
           kind: "HLS_MASTER",
-          url: url ?? SAMPLE_HLS[0],
+          url,
           width: 1280,
           height: 720,
           durationMs: 1000 * (90 + Math.floor(Math.random() * 60)),

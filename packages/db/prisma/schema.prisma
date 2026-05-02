@@ -40,11 +40,27 @@ model User {
   unlocks       EpisodeUnlock[]
   orders        Order[]
   coinTxs       CoinTransaction[]
+  checkIns      CheckIn[]
   auditLogs     AuditLog[]    @relation("AuditActor")
 
   @@index([role])
   @@index([status])
   @@map("user")
+}
+
+// Daily check-in — earn coins for consecutive logins
+model CheckIn {
+  id           String   @id @default(cuid())
+  userId       String
+  date         DateTime @db.Date
+  coinsAwarded Int      @default(0)
+  streak       Int      @default(1)
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }
 
 enum UserRole {
