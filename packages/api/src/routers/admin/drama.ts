@@ -89,6 +89,32 @@ export const adminDramaRouter = router({
     await audit(ctx, "drama.delete", "drama", input.id, null, null);
     return { ok: true };
   }),
+
+  bulkSetStatus: adminProcedure
+    .input(
+      z.object({
+        ids: z.array(z.string()).min(1).max(200),
+        status: z.enum(["DRAFT", "REVIEWING", "PUBLISHED", "OFFLINE"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const r = await ctx.prisma.drama.updateMany({
+        where: { id: { in: input.ids } },
+        data: {
+          status: input.status,
+          ...(input.status === "PUBLISHED" ? { publishedAt: new Date() } : {}),
+        },
+      });
+      await ctx.prisma.auditLog.create({
+        data: {
+          actorId: ctx.user.id,
+          action: "drama.bulkSetStatus",
+          resource: "drama",
+          after: { ids: input.ids, status: input.status, count: r.count } as object,
+        },
+      });
+      return { count: r.count };
+    }),
 });
 
 async function audit(

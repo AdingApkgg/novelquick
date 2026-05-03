@@ -75,6 +75,10 @@ export const dramaRouter = router({
       followed = !!fo;
     }
 
+    const commentCount = await ctx.prisma.comment.count({
+      where: { dramaId: drama.id, status: "VISIBLE" },
+    });
+
     return {
       ...drama,
       playCount: Number(drama.playCount),
@@ -83,6 +87,7 @@ export const dramaRouter = router({
       liked,
       favorited,
       followed,
+      commentCount,
     };
   }),
 

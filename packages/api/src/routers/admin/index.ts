@@ -7,6 +7,9 @@ import { adminFeedRouter } from "./feed";
 import { adminTaxonomyRouter } from "./taxonomy";
 import { adminMonetizationRouter } from "./monetization";
 import { adminStatsRouter } from "./stats";
+import { adminSiteRouter } from "./site";
+import { adminFeedbackRouter } from "./feedback";
+import { adminAuditRouter } from "./audit";
 
 export const adminRouter = router({
   drama: adminDramaRouter,
@@ -17,4 +20,7 @@ export const adminRouter = router({
   taxonomy: adminTaxonomyRouter,
   monetization: adminMonetizationRouter,
   stats: adminStatsRouter,
+  site: adminSiteRouter,
+  feedback: adminFeedbackRouter,
+  audit: adminAuditRouter,
 });

@@ -646,6 +646,49 @@ enum AdType {
   IN_FEED
 }
 
+// ===================== Site config =====================
+
+model SiteSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+// ===================== Feedback =====================
+
+model Feedback {
+  id        String         @id @default(cuid())
+  userId    String?
+  email     String?
+  category  FeedbackCategory @default(OTHER)
+  content   String         @db.Text
+  status    FeedbackStatus @default(OPEN)
+  reply     String?        @db.Text
+  repliedAt DateTime?
+  userAgent String?
+  ip        String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+enum FeedbackCategory {
+  BUG
+  SUGGESTION
+  CONTENT
+  PAYMENT
+  OTHER
+}
+
+enum FeedbackStatus {
+  OPEN
+  PROCESSING
+  CLOSED
+}
+
 // ===================== Audit =====================
 
 model AuditLog {

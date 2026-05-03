@@ -14,6 +14,8 @@ import {
   Sparkles,
   Settings,
   LogOut,
+  ShieldCheck,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@nq/ui/cn";
 import { signOut } from "@/lib/auth-client";
@@ -29,7 +31,9 @@ const NAV = [
   { href: "/comments", label: "评论审核", icon: MessageSquare },
   { href: "/users", label: "用户", icon: Users },
   { href: "/monetization", label: "VIP / 金币", icon: CreditCard },
-  { href: "/settings", label: "设置", icon: Settings },
+  { href: "/feedback", label: "意见反馈", icon: Inbox },
+  { href: "/audit", label: "操作日志", icon: ShieldCheck },
+  { href: "/settings", label: "站点设置", icon: Settings },
 ];
 
 export function Sidebar() {

@@ -9,6 +9,8 @@ import { historyRouter } from "./history";
 import { meRouter } from "./me";
 import { searchRouter } from "./search";
 import { billingRouter } from "./billing";
+import { siteRouter } from "./site";
+import { feedbackRouter } from "./feedback";
 import { adminRouter } from "./admin/index";
 
 export const appRouter = router({
@@ -22,6 +24,8 @@ export const appRouter = router({
   me: meRouter,
   search: searchRouter,
   billing: billingRouter,
+  site: siteRouter,
+  feedback: feedbackRouter,
   admin: adminRouter,
 });
 

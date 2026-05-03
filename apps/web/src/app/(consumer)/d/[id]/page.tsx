@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { trpcServer } from "@/lib/trpc/server";
@@ -5,8 +6,38 @@ import { Badge, Button } from "@nq/ui";
 import { Crown, Play, Lock, Star, Eye } from "lucide-react";
 import { ROUTES } from "@nq/shared/constants";
 import { formatPlayCount } from "@nq/shared/utils";
+import { DramaComments } from "./comments";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const trpc = await trpcServer();
+  const d = await trpc.drama.byId({ id }).catch(() => null);
+  if (!d) return { title: "未找到" };
+  const title = `${d.title}${d.subtitle ? ` · ${d.subtitle}` : ""}`;
+  const desc = d.description?.slice(0, 140) ?? "短剧速看 · 沉浸式短剧观看";
+  return {
+    title,
+    description: desc,
+    openGraph: {
+      title,
+      description: desc,
+      images: d.cover ? [d.cover] : undefined,
+      type: "video.tv_show",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description: desc,
+      images: d.cover ? [d.cover] : undefined,
+    },
+  };
+}
 
 export default async function DramaDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -113,6 +144,9 @@ export default async function DramaDetail({ params }: { params: Promise<{ id: st
             );
           })}
         </div>
+
+        {/* Comments */}
+        <DramaComments dramaId={drama.id} />
 
         {/* Similar */}
         {similar.length > 0 && (

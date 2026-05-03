@@ -10,6 +10,8 @@ import { useRouter } from "next/navigation";
 import { ROUTES } from "@nq/shared/constants";
 import { CheckInCard } from "@/components/check-in-card";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { UserPen, MessageSquare, Info } from "lucide-react";
+import { SiteFooter } from "@/components/footer";
 
 export default function MePage() {
   const trpc = useTRPC();
@@ -72,9 +74,12 @@ export default function MePage() {
       </div>
 
       <ul className="mt-6 divide-y divide-white/5 rounded-2xl bg-card/50">
+        <Item href="/me/profile" icon={<UserPen className="h-5 w-5" />} label="个人资料" />
         <Item href={ROUTES.history} icon={<History className="h-5 w-5" />} label="观看历史" />
         <Item href={ROUTES.follow} icon={<Heart className="h-5 w-5" />} label="追剧 / 收藏" />
         <Item href="/me/orders" icon={<ShoppingBag className="h-5 w-5" />} label="我的订单" />
+        <Item href="/me/feedback" icon={<MessageSquare className="h-5 w-5" />} label="意见反馈" />
+        <Item href="/about" icon={<Info className="h-5 w-5" />} label="关于" />
         <Item href="/me/settings" icon={<Settings className="h-5 w-5" />} label="设置" />
       </ul>
 
@@ -88,6 +93,8 @@ export default function MePage() {
       >
         <LogOut className="mr-2 h-4 w-4" /> 退出登录
       </Button>
+
+      <SiteFooter />
     </div>
   );
 }

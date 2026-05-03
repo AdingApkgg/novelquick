@@ -18,6 +18,9 @@ import {
   PictureInPicture2,
   Gauge,
   X,
+  Volume2,
+  VolumeX,
+  Volume1,
 } from "lucide-react";
 import {
   Sheet,
@@ -61,6 +64,10 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
   const [pipActive, setPipActive] = React.useState(false);
   const [autoNextSec, setAutoNextSec] = React.useState<number | null>(null);
   const cancelAutoNextRef = React.useRef(false);
+  const [muted, setMuted] = React.useState(false);
+  const [volume, setVolume] = React.useState(1);
+  const [showVolume, setShowVolume] = React.useState(false);
+  const [seekHint, setSeekHint] = React.useState<{ delta: number; show: boolean } | null>(null);
 
   // Find next playable episode
   const nextEpisode = React.useMemo(
@@ -114,6 +121,120 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
     setAutoNextSec(null);
     cancelAutoNextRef.current = false;
   }, [data.episode.id]);
+
+  // Persist volume
+  React.useEffect(() => {
+    try {
+      const v = localStorage.getItem("nq_volume");
+      if (v) setVolume(Math.min(1, Math.max(0, parseFloat(v) || 1)));
+    } catch {}
+  }, []);
+  React.useEffect(() => {
+    const v = videoRef.current;
+    if (v) {
+      v.volume = volume;
+      v.muted = muted;
+    }
+    try {
+      localStorage.setItem("nq_volume", String(volume));
+    } catch {}
+  }, [volume, muted, data.episode.id]);
+
+  // Keyboard shortcuts: space (play/pause), arrows (seek/volume), m (mute), f (fullscreen)
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // ignore shortcuts when typing
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+
+      const v = videoRef.current;
+      if (!v) return;
+      switch (e.key.toLowerCase()) {
+        case " ":
+          e.preventDefault();
+          if (v.paused) {
+            v.play();
+            setPaused(false);
+          } else {
+            v.pause();
+            setPaused(true);
+          }
+          break;
+        case "arrowleft":
+          v.currentTime = Math.max(0, v.currentTime - 5);
+          showSeekHint(-5);
+          break;
+        case "arrowright":
+          v.currentTime = Math.min(v.duration || 0, v.currentTime + 5);
+          showSeekHint(5);
+          break;
+        case "arrowup":
+          e.preventDefault();
+          setVolume((x) => Math.min(1, x + 0.1));
+          setShowVolume(true);
+          break;
+        case "arrowdown":
+          e.preventDefault();
+          setVolume((x) => Math.max(0, x - 0.1));
+          setShowVolume(true);
+          break;
+        case "m":
+          setMuted((m) => !m);
+          break;
+        case "f":
+          if (document.fullscreenElement) document.exitFullscreen();
+          else v.requestFullscreen?.();
+          break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Hide volume slider after 1.5s idle
+  React.useEffect(() => {
+    if (!showVolume) return;
+    const t = setTimeout(() => setShowVolume(false), 1500);
+    return () => clearTimeout(t);
+  }, [showVolume, volume]);
+
+  function showSeekHint(delta: number) {
+    setSeekHint({ delta, show: true });
+    setTimeout(() => setSeekHint(null), 700);
+  }
+
+  // Double-tap seek
+  const lastTapRef = React.useRef<{ t: number; x: number } | null>(null);
+  const handleVideoTap = (e: React.MouseEvent) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const now = Date.now();
+    const last = lastTapRef.current;
+    const x = e.clientX;
+    const w = (e.currentTarget as HTMLElement).clientWidth;
+    if (last && now - last.t < 300 && Math.abs(last.x - x) < 60) {
+      // double-tap detected
+      if (x < w / 3) {
+        v.currentTime = Math.max(0, v.currentTime - 10);
+        showSeekHint(-10);
+      } else if (x > (w * 2) / 3) {
+        v.currentTime = Math.min(v.duration || 0, v.currentTime + 10);
+        showSeekHint(10);
+      } else {
+        togglePlay();
+      }
+      lastTapRef.current = null;
+    } else {
+      lastTapRef.current = { t: now, x };
+      // single-tap (deferred): toggle play after 250ms if no second tap
+      setTimeout(() => {
+        if (lastTapRef.current && lastTapRef.current.t === now) {
+          togglePlay();
+          lastTapRef.current = null;
+        }
+      }, 280);
+    }
+  };
 
   const likeMut = useMutation(trpc.interact.toggleLike.mutationOptions());
   const favMut = useMutation(trpc.interact.toggleFavorite.mutationOptions());
@@ -185,7 +306,7 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
           className="h-full w-full object-contain"
           onTimeUpdateMs={onTimeUpdate}
           onEnded={onEnded}
-          onClick={togglePlay}
+          onClick={handleVideoTap}
         />
       ) : data.episode.locked ? (
         <LockedView dramaId={dramaId} episode={data.episode} drama={data.drama} />
@@ -280,12 +401,31 @@ export function WatchClient({ dramaId, initial }: { dramaId: string; initial: Wa
           totalEpisodes={data.drama.totalEpisodes}
         />
         <SpeedSheet speed={speed} onChange={setSpeed} />
+        <VolumeControl
+          muted={muted}
+          volume={volume}
+          show={showVolume}
+          onToggleMute={() => setMuted((m) => !m)}
+          onChange={(v) => {
+            setVolume(v);
+            setMuted(false);
+            setShowVolume(true);
+          }}
+          onShow={() => setShowVolume(true)}
+        />
         <ActionButton
           icon={<PictureInPicture2 className={`h-7 w-7 ${pipActive ? "text-primary" : ""}`} />}
           label="画中画"
           onClick={togglePip}
         />
       </div>
+
+      {/* Seek hint overlay */}
+      {seekHint && (
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/70 px-4 py-2 text-sm text-white">
+          {seekHint.delta > 0 ? `快进 ${seekHint.delta}s ›` : `‹ 快退 ${Math.abs(seekHint.delta)}s`}
+        </div>
+      )}
 
       {/* Bottom info */}
       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 px-4 pb-2 text-white">
@@ -369,6 +509,49 @@ function ActionButton({
       </div>
       <span className="text-[11px]">{label}</span>
     </button>
+  );
+}
+
+function VolumeControl({
+  muted,
+  volume,
+  show,
+  onToggleMute,
+  onChange,
+  onShow,
+}: {
+  muted: boolean;
+  volume: number;
+  show: boolean;
+  onToggleMute: () => void;
+  onChange: (v: number) => void;
+  onShow: () => void;
+}) {
+  const Icon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  return (
+    <div className="relative">
+      <button onClick={onToggleMute} onMouseEnter={onShow} className="flex flex-col items-center gap-1 text-white">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm">
+          <Icon className="h-7 w-7" />
+        </div>
+        <span className="text-[11px]">{muted ? "静音" : `${Math.round(volume * 100)}%`}</span>
+      </button>
+      {show && (
+        <div
+          className="absolute right-14 top-1/2 -translate-y-1/2 rounded-full bg-black/70 px-3 py-2 backdrop-blur-md"
+          onMouseEnter={onShow}
+        >
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(volume * 100)}
+            onChange={(e) => onChange(parseInt(e.target.value, 10) / 100)}
+            className="h-1 w-32 cursor-pointer accent-primary"
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
