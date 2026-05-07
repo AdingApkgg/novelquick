@@ -4,14 +4,22 @@ import { Id, Slug } from "./common";
 export const DramaStatus = z.enum(["DRAFT", "REVIEWING", "PUBLISHED", "OFFLINE"]);
 export const ReleaseStatus = z.enum(["ONGOING", "COMPLETED", "PAUSED"]);
 
+const OptionalUrl = z
+  .preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.string().url().optional(),
+  )
+  .nullable()
+  .optional();
+
 export const CreateDrama = z.object({
   slug: Slug,
   title: z.string().min(1).max(120),
   subtitle: z.string().max(120).optional().nullable(),
   description: z.string().max(2000).optional().nullable(),
-  cover: z.string().url().optional().nullable(),
-  poster: z.string().url().optional().nullable(),
-  trailerUrl: z.string().url().optional().nullable(),
+  cover: OptionalUrl,
+  poster: OptionalUrl,
+  trailerUrl: OptionalUrl,
   status: DramaStatus.default("DRAFT"),
   releaseStatus: ReleaseStatus.default("ONGOING"),
   region: z.string().max(40).optional().nullable(),

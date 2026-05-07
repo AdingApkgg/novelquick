@@ -19,12 +19,14 @@ export function clamp(n: number, min: number, max: number): number {
 }
 
 export function slugify(input: string): string {
-  return input
+  const slug = input
     .toLowerCase()
     .trim()
-    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
+  if (slug) return slug;
+  return `t-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function isVipActive(vipUntil: Date | null | undefined): boolean {
